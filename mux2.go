@@ -16,13 +16,13 @@ import (
 var (
 	// ErrMethodMismatch is returned when the method in the request does not match
 	// the method defined against the route.
-	ErrMethodMismatch = errors.New("method is not allowed")
+	ErrMethodMismatch2 = errors.New("method is not allowed")
 	// ErrNotFound is returned when no route match is found.
-	ErrNotFound = errors.New("no matching route was found")
+	ErrNotFound2 = errors.New("no matching route was found")
 )
 
 // NewRouter returns a new router instance.
-func NewRouter() *Router2 {
+func NewRouter2() *Router2 {
 	return &Router{namedRoutes: make(map[string]*Route)}
 }
 
@@ -95,7 +95,7 @@ type routeConf2 struct {
 }
 
 // returns an effective deep copy of `routeConf`
-func copyRouteConf(r routeConf2) routeConf2 {
+func copyRouteConf2(r routeConf2) routeConf2 {
 	c := r
 
 	if r.regexp.path != nil {
@@ -146,7 +146,7 @@ func (r *Router2) Match(req *http.Request, match *RouteMatch) bool {
 		}
 	}
 
-	if match.MatchErr == ErrMethodMismatch {
+	if match.MatchErr == ErrMethodMismatch2 {
 		if r.MethodNotAllowedHandler != nil {
 			match.Handler = r.MethodNotAllowedHandler
 			return true
@@ -267,333 +267,6 @@ func (r *Router) SkipClean(value bool) *Router {
 func (r *Router) UseEncodedPath() *Router {
 	r.useEncodedPath = true
 	return r
-}
-
-// ----------------------------------------------------------------------------
-// Route factories
-// ----------------------------------------------------------------------------
-
-// NewRoute registers an empty route.
-func (r *Router2) NewRoute() *Route {
-	// initialize a route with a copy of the parent router's configuration
-	route := &Route{routeConf: copyRouteConf(r.routeConf), namedRoutes: r.namedRoutes}
-	r.routes = append(r.routes, route)
-	return route
-}
-
-// Name registers a new route with a name.
-// See Route.Name().
-func (r *Router2) Name(name string) *Route {
-	return r.NewRoute().Name(name)
-}
-
-// Handle registers a new route with a matcher for the URL path.
-// See Route.Path() and Route.Handler().
-func (r *Router2) Handle(path string, handler http.Handler) *Route {
-	return r.NewRoute().Path(path).Handler(handler)
-}
-
-// HandleFunc registers a new route with a matcher for the URL path.
-// See Route.Path() and Route.HandlerFunc().
-func (r *Router2) HandleFunc(path string, f func(http.ResponseWriter,
-	*http.Request)) *Route {
-	return r.NewRoute().Path(path).HandlerFunc(f)
-}
-
-// Headers registers a new route with a matcher for request header values.
-// See Route.Headers().
-func (r *Router2) Headers(pairs ...string) *Route {
-	return r.NewRoute().Headers(pairs...)
-}
-
-// Host registers a new route with a matcher for the URL host.
-// See Route.Host().
-func (r *Router2) Host(tpl string) *Route {
-	return r.NewRoute().Host(tpl)
-}
-
-// MatcherFunc registers a new route with a custom matcher function.
-// See Route.MatcherFunc().
-func (r *Router2) MatcherFunc(f MatcherFunc) *Route {
-	return r.NewRoute().MatcherFunc(f)
-}
-
-// Methods registers a new route with a matcher for HTTP methods.
-// See Route.Methods().
-func (r *Router2) Methods(methods ...string) *Route {
-	return r.NewRoute().Methods(methods...)
-}
-
-// Path registers a new route with a matcher for the URL path.
-// See Route.Path().
-func (r *Router2) Path(tpl string) *Route {
-	return r.NewRoute().Path(tpl)
-}
-
-// PathPrefix registers a new route with a matcher for the URL path prefix.
-// See Route.PathPrefix().
-func (r *Router2) PathPrefix(tpl string) *Route {
-	return r.NewRoute().PathPrefix(tpl)
-}
-
-// Queries registers a new route with a matcher for URL query values.
-// See Route.Queries().
-func (r *Router2) Queries(pairs ...string) *Route {
-	return r.NewRoute().Queries(pairs...)
-}
-
-// Schemes registers a new route with a matcher for URL schemes.
-// See Route.Schemes().
-func (r *Router2) Schemes(schemes ...string) *Route {
-	return r.NewRoute().Schemes(schemes...)
-}
-
-// BuildVarsFunc registers a new route with a custom function for modifying
-// route variables before building a URL.
-func (r *Router2) BuildVarsFunc(f BuildVarsFunc) *Route {
-	return r.NewRoute().BuildVarsFunc(f)
-}
-
-// Walk walks the router and all its sub-routers, calling walkFn for each route
-// in the tree. The routes are walked in the order they were added. Sub-routers
-// are explored depth-first.
-func (r *Router2) Walk(walkFn WalkFunc) error {
-	return r.walk(walkFn, []*Route{})
-}
-
-// SkipRouter is used as a return value from WalkFuncs to indicate that the
-// router that walk is about to descend down to should be skipped.
-var SkipRouter = errors.New("skip this router")
-
-// WalkFunc is the type of the function called for each route visited by Walk.
-// At every invocation, it is given the current route, and the current router,
-// and a list of ancestor routes that lead to the current route.
-type WalkFunc func(route *Route, router *Router2, ancestors []*Route) error
-
-func (r *Router2) walk(walkFn WalkFunc, ancestors []*Route) error {
-	for _, t := range r.routes {
-		err := walkFn(t, r, ancestors)
-		if err == SkipRouter {
-			continue
-		}
-		if err != nil {
-			return err
-		}
-		for _, sr := range t.matchers {
-			if h, ok := sr.(*Router); ok {
-				ancestors = append(ancestors, t)
-				err := h.walk(walkFn, ancestors)
-				if err != nil {
-					return err
-				}
-				ancestors = ancestors[:len(ancestors)-1]
-			}
-		}
-		if h, ok := t.handler.(*Router); ok {
-			ancestors = append(ancestors, t)
-			err := h.walk(walkFn, ancestors)
-			if err != nil {
-				return err
-			}
-			ancestors = ancestors[:len(ancestors)-1]
-		}
-	}
-	return nil
-}
-
-// ----------------------------------------------------------------------------
-// Context
-// ----------------------------------------------------------------------------
-
-// RouteMatch stores information about a matched route.
-type RouteMatch2 struct {
-	Route   *Route
-	Handler http.Handler
-	Vars    map[string]string
-
-	// MatchErr is set to appropriate matching error
-	// It is set to ErrMethodMismatch if there is a mismatch in
-	// the request method and route method
-	MatchErr error
-}
-
-type contextKey int
-
-const (
-	varsKey contextKey = iota
-	routeKey
-)
-
-// Vars returns the route variables for the current request, if any.
-func Vars(r *http.Request) map[string]string {
-	if rv := r.Context().Value(varsKey); rv != nil {
-		return rv.(map[string]string)
-	}
-	return nil
-}
-
-// CurrentRoute returns the matched route for the current request, if any.
-// This only works when called inside the handler of the matched route
-// because the matched route is stored in the request context which is cleared
-// after the handler returns.
-func CurrentRoute(r *http.Request) *Route {
-	if rv := r.Context().Value(routeKey); rv != nil {
-		return rv.(*Route)
-	}
-	return nil
-}
-
-func requestWithVars(r *http.Request, vars map[string]string) *http.Request {
-	ctx := context.WithValue(r.Context(), varsKey, vars)
-	return r.WithContext(ctx)
-}
-
-func requestWithRoute(r *http.Request, route *Route) *http.Request {
-	ctx := context.WithValue(r.Context(), routeKey, route)
-	return r.WithContext(ctx)
-}
-
-// ----------------------------------------------------------------------------
-// Helpers
-// ----------------------------------------------------------------------------
-
-// cleanPath returns the canonical path for p, eliminating . and .. elements.
-// Borrowed from the net/http package.
-func cleanPath(p string) string {
-	if p == "" {
-		return "/"
-	}
-	if p[0] != '/' {
-		p = "/" + p
-	}
-	np := path.Clean(p)
-	// path.Clean removes trailing slash except for root;
-	// put the trailing slash back if necessary.
-	if p[len(p)-1] == '/' && np != "/" {
-		np += "/"
-	}
-
-	return np
-}
-
-// uniqueVars returns an error if two slices contain duplicated strings.
-func uniqueVars(s1, s2 []string) error {
-	for _, v1 := range s1 {
-		for _, v2 := range s2 {
-			if v1 == v2 {
-				return fmt.Errorf("mux: duplicated route variable %q", v2)
-			}
-		}
-	}
-	return nil
-}
-
-// checkPairs returns the count of strings passed in, and an error if
-// the count is not an even number.
-func checkPairs(pairs ...string) (int, error) {
-	length := len(pairs)
-	if length%2 != 0 {
-		return length, fmt.Errorf(
-			"mux: number of parameters must be multiple of 2, got %v", pairs)
-	}
-	return length, nil
-}
-
-// mapFromPairsToString converts variadic string parameters to a
-// string to string map.
-func mapFromPairsToString(pairs ...string) (map[string]string, error) {
-	length, err := checkPairs(pairs...)
-	if err != nil {
-		return nil, err
-	}
-	m := make(map[string]string, length/2)
-	for i := 0; i < length; i += 2 {
-		m[pairs[i]] = pairs[i+1]
-	}
-	return m, nil
-}
-
-// mapFromPairsToRegex converts variadic string parameters to a
-// string to regex map.
-func mapFromPairsToRegex(pairs ...string) (map[string]*regexp.Regexp, error) {
-	length, err := checkPairs(pairs...)
-	if err != nil {
-		return nil, err
-	}
-	m := make(map[string]*regexp.Regexp, length/2)
-	for i := 0; i < length; i += 2 {
-		regex, err := regexp.Compile(pairs[i+1])
-		if err != nil {
-			return nil, err
-		}
-		m[pairs[i]] = regex
-	}
-	return m, nil
-}
-
-// matchInArray returns true if the given string value is in the array.
-func matchInArray(arr []string, value string) bool {
-	for _, v := range arr {
-		if v == value {
-			return true
-		}
-	}
-	return false
-}
-
-// matchMapWithString returns true if the given key/value pairs exist in a given map.
-func matchMapWithString(toCheck map[string]string, toMatch map[string][]string, canonicalKey bool) bool {
-	for k, v := range toCheck {
-		// Check if key exists.
-		if canonicalKey {
-			k = http.CanonicalHeaderKey(k)
-		}
-		if values := toMatch[k]; values == nil {
-			return false
-		} else if v != "" {
-			// If value was defined as an empty string we only check that the
-			// key exists. Otherwise we also check for equality.
-			valueExists := false
-			for _, value := range values {
-				if v == value {
-					valueExists = true
-					break
-				}
-			}
-			if !valueExists {
-				return false
-			}
-		}
-	}
-	return true
-}
-
-// matchMapWithRegex returns true if the given key/value pairs exist in a given map compiled against
-// the given regex
-func matchMapWithRegex(toCheck map[string]*regexp.Regexp, toMatch map[string][]string, canonicalKey bool) bool {
-	for k, v := range toCheck {
-		// Check if key exists.
-		if canonicalKey {
-			k = http.CanonicalHeaderKey(k)
-		}
-		if values := toMatch[k]; values == nil {
-			return false
-		} else if v != nil {
-			// If value was defined as an empty string we only check that the
-			// key exists. Otherwise we also check for equality.
-			valueExists := false
-			for _, value := range values {
-				if v.MatchString(value) {
-					valueExists = true
-					break
-				}
-			}
-			if !valueExists {
-				return false
-			}
-		}
-	}
-	return true
 }
 
 // methodNotAllowed replies to the request with an HTTP status code 405.
