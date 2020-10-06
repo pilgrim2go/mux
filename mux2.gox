@@ -1,4 +1,4 @@
-package "abc"
+package "abcx"
 import "fmt"
 func mainx() {
     fmt.Println("hello world")
