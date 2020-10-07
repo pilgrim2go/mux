@@ -1,4 +1,4 @@
-package "abcx"
+package "abcx06102020"
 import "fmt"
 func mainx() {
     fmt.Println("hello world")
